@@ -1,6 +1,9 @@
 // api/proxy.js
+// Simple CORS proxy that forwards JSON POST to the target Google Apps Script URL.
+// Deploy this to Vercel (Node runtime).
+
 export default async function handler(req, res) {
-  // allow CORS (untuk Wokwi / browser)
+  // Allow CORS for Wokwi/browser during development
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -9,31 +12,29 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // target URL dari query param `url`
+  // Get target URL from query param `url`
   const target = req.query.url;
   if (!target) {
     return res.status(400).json({ error: "Missing url query parameter" });
   }
 
   try {
-    // forward request method, body dan headers minimal Content-Type
     const fetchOptions = {
       method: req.method,
       headers: {
-        // biarkan content-type dari client kalau ada
         "Content-Type": req.headers["content-type"] || "application/json"
       },
-      // body hanya untuk method yang mengizinkan
+      // forward the body as JSON string (works even if req.body is parsed)
       body: (req.method === "GET" || req.method === "HEAD") ? undefined : JSON.stringify(req.body)
     };
 
     const forwardRes = await fetch(target, fetchOptions);
     const text = await forwardRes.text();
 
-    // forward status & body kembali ke client (ESP32/Wokwi)
+    // Forward response status & body to client
     res.status(forwardRes.status).send(text);
   } catch (err) {
     console.error("Proxy error:", err);
-    res.status(500).json({ error: err.toString() });
+    res.status(500).json({ error: String(err) });
   }
 }
